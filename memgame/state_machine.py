@@ -2,33 +2,44 @@ from . import logger
 
 
 class Context():
-    def __init__(self, state):
+    def __init__(self, game, state):
         self._state = state
-        self._state._context = self
-        self.data = {}
+        self._state.context = self
+        self.game = game
 
 
     def on_event(self, event):
+        logger.debug('Event: {}'.format(event))
         self._state = self._state.on_event(event)
-        self._state._context = self
-
+        self._state.context = self
+        
 
 class State():
     def __init__(self):
         logger.debug(f'Processing current state: {str(self)}')
-    
-    
-    @property
-    def context(self):
-        return self._context
-        
-    @context.setter
-    def context(self, context):
-        self._context = context
-    
+        self.context = None
+
     
     def on_event(self, event):
         raise NotImplementedError()
+
+
+    @property
+    def game_state(self):
+        raise Exception()
+
+    @game_state.getter
+    def game_state(self):
+        return self.context.game.state
+
+
+    @property
+    def game(self):
+        raise Exception()
+    
+    @game.getter
+    def game(self):
+        return self.context.game
 
 
     def __repr__(self):
