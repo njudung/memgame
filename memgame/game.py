@@ -1,45 +1,89 @@
-from guizero import App, Drawing
+#from guizero import App, Drawing
+import pygame, sys
+from pygame.locals import *
+from .events import *
+from .colors import *
 from gpiozero import Button, LED
 from signal import pause
 from . import logger
-from .state_machine import Context, State
 from time import sleep
 from random import randint
 
 
+TICKS = 30
+DISPLAY_SIZE = (1920, 1080)
+
+
 class Game():
     def __init__(self):
-        self.state = {
-            'buttons': [Button(10), Button(9), Button(11)],
-            'leds': [LED(17), LED(27), LED(22)],
-            'combination': [],
-            'position': 0,
-            'highscore': Game.load_highscore()
-            }
+        pygame.init()
 
+        self.state = WaitState(self)
+        self.next_state = None
+ 
+        self.buttons = [Button(10), Button(9), Button(11)]
+        self.leds = [LED(17), LED(27), LED(22)]
+        self.combination = []
+        self.position = 0
+        self.highscore = Game.load_highscore()
 
-        self.app = App(title="Memgame", bg=(30, 30, 30))
-        self.app.set_full_screen()
-        self.drawing = Drawing(self.app, width="fill", height="fill")
+        self.clock = pygame.time.Clock()
+        
+        self.font = pygame.font.SysFont(None, 50)
 
-        self.ctx = Context(self, WaitState())
+        self.screen = pygame.display.set_mode(DISPLAY_SIZE)
+
+        ## Initialize buttons
+        for i, button in enumerate(self.buttons):
+            button.when_pressed = lambda btn=button, num=i: pygame.event.post(pygame.event.Event(BUTTON_PRESSED, {'button': btn, 'num': num}))
+            button.when_released = lambda btn=button, num=i: pygame.event.post(pygame.event.Event(BUTTON_RELEASED, {'button': btn, 'num': num}))
 
 
     def run(self):
-        for i, button in enumerate(self.state['buttons']):
-            button.when_pressed = lambda btn=button, num=i: self.ctx.on_event({'name': 'button_pressed', 'button': btn, 'num': num})
-            button.when_released = lambda btn=button, num=i: self.ctx.on_event({'name': 'button_released', 'button': btn, 'num': num})
+        while True:
+            for event in pygame.event.get():
+                logger.debug("Processing event {}".format(event))
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                elif event.type == pygame.KEYDOWN and event.unicode == "f":
+                    pygame.display.toggle_fullscreen()
+                elif event.type == CHANGE_STATE:
+                    self.next_state = event.next_state
+                else:
+                    self.state.on_event(event)
+         
+            self._draw()
+            
+            if self.next_state:
+                old_state = self.state
+                self.state = self.next_state(self)
+                self.next_state = None
+                pygame.event.post(pygame.event.Event(STATE_CHANGED, {"from": str(old_state)}))
+                
+            self.clock.tick(TICKS)
 
-        self.app.display()
-    
+
+    def set_state(self, next_state):
+        pygame.event.post(pygame.event.Event(CHANGE_STATE, {"next_state": next_state}))
+
+
+    def _draw(self):
+        self.screen.fill(BG)
+        
+        #if self.state: 
+        self.state.draw()
+        
+        pygame.display.flip()
+
 
     def turn_off_leds(self):
-        for led in self.state['leds']:
+        for led in self.leds:
             led.off()
         
 
     def turn_on_leds(self):
-        for led in self.state['leds']:
+        for led in self.leds:
             led.on()
 
 
@@ -73,125 +117,146 @@ class Game():
             for name, score in scores.sort(lambda item: item[1]):
                 fp.write(f"{name}|{score}")
             
+            
+class State():
+    def __init__(self, game):
+        logger.debug(f'Changing to state: {str(self)}')
+        self.game = game
+
+
+    def __repr__(self):
+        return self.__str__()
+
+
+    def __str__(self):
+        return self.__class__.__name__
+
+
+    def draw(self):
+        raise NotImplementedError
+
+
+    def on_event(self, event):
+        raise NotImplementedError
 
 
 class WaitState(State):
     def on_event(self, event):
-        if event['name'] == 'init':
-            dwg = self.drawing
-            dwg.clear()
-            dwg.text(10, 10, "MEMGAME", color=(250, 250, 250), size=50)
-            dwg.text(10, 100, "Tryck på en knapp", color=(250, 250, 250), size=30)
-
-
-        if event['name'] == 'button_pressed':
+        if event.type == BUTTON_PRESSED:
             logger.info('Starting game.')
-            self.game_state['combination'] = []  # Reset combination
-            return ShowCombinationState()
+            self.combination = []  # Reset combination
+            
+            self.game.set_state(ShowCombinationState)
 
-        return self
+    def draw(self):
+        font = self.game.font
+        text = font.render("MinnesSpel", True, FG)
+        self.game.screen.blit(text, (100, 100))
 
 
 class StartGameState(State):
     def on_event(self, event):
-        if event['name'] == 'init':
-            dwg = self.drawing
-            dwg.clear()
-            dwg.text(10, 10, "", color=(250, 250, 250), size=50)
-            dwg.text(10, 100, "Starting game", color=(250, 250, 250), size=30)
+        self.game.combination = []
 
-            self.game_state['combination'] = []
-            self.game_state['position'] = 0
-    
-            sleep(1)
-    
-            return ShowCombinationState()
-    
-        return self
-    
+        self.game.set_state(ShowCombinationState)
+
+
+    def on_event(self, event):
+        pass
+
+
+    def draw(self):
+        pass
+
 
 class ShowCombinationState(State):
     def on_event(self, event):
-        if event['name'] == 'init':
-            dwg = self.drawing
-            dwg.clear()
-            dwg.text(10, 10, "", color=(250, 250, 250), size=50)
-            dwg.text(10, 100, "Memorera sekvensen!", color=(250, 250, 250), size=30)
+        if event.type == STATE_CHANGED:
+            nv = randint(0, len(self.game.leds) - 1)
+            if len(self.game.combination) and nv == self.game.combination[-1]:
+                nv = randint(0, len(self.game.leds) - 1)
 
-            nv = randint(0, len(self.game_state['leds']) - 1)
-            if len(self.game_state['combination']) and nv == self.game_state['combination'][-1]:
-                nv = randint(0, len(self.game_state['leds']) - 1)
+            self.game.combination.append(nv)
+            logger.debug('Combination updated to: {}'.format(', '.join([str(v) for v in self.game.combination])))
 
-            self.game_state['combination'].append(nv)
-            logger.debug('Combination updated to: {}'.format(', '.join([str(v) for v in self.game_state['combination']])))
+            self.position = 0
 
-            # Flash all leds once to indicate start of sequence.
-            sleep(1)
-            self.game.turn_on_leds()
-            sleep(0.1)
-            self.game.turn_off_leds()
+            self.ticks = 0
+            pygame.time.set_timer(pygame.event.Event(TICK, {}), 100)
 
-            
-            for v in self.game_state['combination']:
+
+        if event.type == TICK:
+            if self.ticks == 0:
+                self.game.leds[self.game.combination[self.game.position]].on()
+                self.game.position += 1
+
+            if self.ticks == 8:
                 self.game.turn_off_leds()
-                sleep(0.1)
+                
+            self.ticks = (self.ticks + 1) % 10
 
-                self.game_state['leds'][v].on()
-                sleep(1)
+            if self.game.position >= len(self.game.combination):
+                pygame.time.set_timer(pygame.event.Event(TICK, {}), 0)
+                self.game.set_state(RepeatCombinationState)
+                return
+ 
 
-                self.game.turn_off_leds()
+    def draw(self):
+        font = self.game.font
 
-        return RepeatCombinationState()
+        n = len(self.game.combination)
+        c = self.game.position
+
+        text = font.render("{}{}".format("X" * c, "-" * (n - c)), True, FG)
+        self.game.screen.blit(text, (100, 100))
 
 
 class RepeatCombinationState(State):
     def on_event(self, event):
-        if event['name'] == 'init':
-            dwg = self.drawing
-            dwg.clear()
-            dwg.text(10, 100, "Upprepa sekvensen", color=(250, 250, 250), size=30)
+        if event.type == STATE_CHANGED:
+            self.game.position = 0
+            self.game.turn_off_leds()
 
-            self.game_state['position'] = 0
+        if event.type == BUTTON_PRESSED:
+            """ Flash once to confirm correct button press. """
+            self.game.leds[event.num].on()
 
-
-        if event['name'] == 'button_pressed':
+        if event.type == BUTTON_RELEASED:
             """ Check for correct button press. """
-            self.game_state['leds'][event['num']].on()
+            self.game.leds[event.num].off()
 
             # Correct button?
-            if event['num'] == self.game_state['combination'][self.game_state['position']]:
-                self.game_state['position'] += 1
+            if event.num == self.game.combination[self.game.position]:
+                self.game.position += 1
 
-                if self.game_state['position'] >= len(self.game_state['combination']):
-                    return ShowCombinationState()
+                if self.game.position >= len(self.game.combination):
+                    self.game.set_state(ShowCombinationState)
 
             else:
-                logger.info('Wrong button. Game over.')
-                
-                self.game.flash_leds()
-                
-                return GameOverState()                                
-        
-        if event['name'] == 'button_released':
-            """ Flash once to confirm correct button press. """
-            self.game_state['leds'][event['num']].off()
-            sleep(0.1)
-            self.game_state['leds'][event['num']].on()
-            sleep(0.05)
-            self.game_state['leds'][event['num']].off()
-            sleep(0.05)
-
-        return self
+                self.game.set_state(GameOverState)
+    
+    
+    def draw(self):
+        font = self.game.font
+        text = font.render("Repetera", True, FG)
+        self.game.screen.blit(text, (100, 100))
 
 
 class GameOverState(State):
     def on_event(self, event):
-        if event['name'] == 'init':
-            dwg = self.drawing
-            dwg.clear()
-            dwg.text(10, 10, "GAME OVER!", color=(250, 250, 250), size=50)
+        if event.type == STATE_CHANGED:
+            logger.info('Wrong button. Game over.')
+
+            self.game.combination = []
+
+            self.game.flash_leds()
         
-        if event['name'] == 'button_pressed':
-            return WaitState()
-        
-        return self
+        if event.type == BUTTON_PRESSED:
+            self.game.set_state(WaitState)
+
+
+    def draw(self):
+        self.game.screen.fill(GAME_OVER_BG)
+        font = self.game.font
+        text = font.render("GAME OVER", True, GAME_OVER_FG)
+        self.game.screen.blit(text, (100, 100))
