@@ -4,10 +4,11 @@ from .game import Game
 
 
 @click.command()
-@click.option('--debug', is_flag=True, default=False, help="Run in debug mode.")
+@click.option("--debug", is_flag=True, default=False, help="Run in debug mode.")
 def run(debug):
     if debug:
         import logging
+
         logger.setLevel(logging.DEBUG)
 
     game = Game()
