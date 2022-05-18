@@ -3,14 +3,11 @@ from pygame.locals import *
 from random import random, choice, randint
 from math import atan2, sqrt, cos, sin, pi as PI
 
-SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 1080
-FPS = 30
-TIME_PER_TICK = 1 / FPS
-DISPLAY_SIZE = (1920, 1080)
+from ..config import *
+
 
 K_air = 0.001  # Air resistance constant
-G_r = 100 / FPS  # Gravity constant
+G_r = 100 / TICKS  # Gravity constant
 G_phi = PI / 2
 
 COLORS = [
@@ -181,34 +178,3 @@ class FireworkStar(Firework):
             return x / PI
         else:
             return 1.0 - ((x - PI) / PI)
-
-
-pygame.init()
-clock = pygame.time.Clock()
-window = pygame.display.set_mode(DISPLAY_SIZE)
-
-fireworks = []
-
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-
-        if event.type == pygame.KEYDOWN and event.key == 102:
-            fireworks.append(choice([Firework, FireworkDouble, FireworkStar])())
-
-    for firework in fireworks:
-        firework.tick()
-
-    fireworks = [f for f in fireworks if not f.dead()]
-
-    window.fill(BACKGROUND)
-
-    for firework in fireworks:
-        firework.draw(window)
-
-    # print(sum([len(f.particles) for f in fireworks]))
-
-    pygame.display.flip()
-    clock.tick(FPS)

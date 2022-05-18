@@ -9,12 +9,9 @@ from . import logger
 from .events import *
 from .colors import *
 from .state import State
-
-
-BASE_DIR = os.path.dirname(os.path.abspath(__name__))
-
-TICKS = 30
-DISPLAY_SIZE = (1920, 1080)
+from .effects.lines import Line
+from .effects.fireworks import Firework
+from .config import *
 
 
 def middle_pos(src, dest):
@@ -32,6 +29,7 @@ class Game:
         pygame.init()
 
         self.state = WaitState(self)
+        #self.state = HighScoreState(self)
         self.next_state = None
 
         self.buttons = [Button(10), Button(9), Button(11)]
@@ -71,6 +69,8 @@ class Game:
                 else:
                     self.state.on_event(event)
 
+            self._tick()
+
             self._draw()
 
             if self.next_state:
@@ -83,6 +83,9 @@ class Game:
 
     def set_state(self, next_state):
         pygame.event.post(pygame.event.Event(CHANGE_STATE, {"next_state": next_state}))
+
+    def _tick(self):
+        self.state.tick()
 
     def _draw(self):
         self.screen.fill(BG)
@@ -131,7 +134,7 @@ class Game:
 
 
 class WaitState(State):
-    particles = []
+    lines = []
 
     def on_event(self, event):
         if event.type == BUTTON_PRESSED:
@@ -140,14 +143,24 @@ class WaitState(State):
 
             self.game.set_state(ShowCombinationState)
 
+    def tick(self):
+        for line in self.lines:
+            line.tick()
+
+        if randint(0, 19) == 0:
+            self.lines.append(Line())
+
+        self.lines = [line for line in self.lines if not line.dead()]
+
+
     def draw(self):
-        if randint(0, 99) == 0:
-            WaitState.particles.append([randint(0, 1920), randint(0, 1080), 1, 2, 3])
+        s = pygame.Surface((DISPLAY_SIZE[0], DISPLAY_SIZE[1] * 1.4))
+        s.fill(BG)
 
-        for i, particle in enumerate(WaitState.particles):
-            x, y, vx, vy, size = particle
-
-            pygame.draw.circle(self.game.screen, FG, (x, y), size)
+        for line in self.lines:
+            line.draw(s)
+        
+        self.game.screen.blit(s, (0, - DISPLAY_SIZE[1] * 0.2))
 
         font = self.game.font_large
         text = font.render("MinnesSpel", True, FG)
@@ -271,3 +284,23 @@ class GameOverState(State):
         font = self.game.font_xlarge
         text = font.render("GAME OVER", True, GAME_OVER_FG)
         self.game.screen.blit(text, middle_pos(text, self.game.screen))
+
+
+class HighScoreState(State):
+    fireworks = [Firework() for _ in range(5)]
+
+    def on_event(self, event):
+        pass
+    
+    def tick(self):
+        if randint(0, 29) == 0:
+            self.fireworks.append(Firework())
+        
+        for firework in self.fireworks:
+            firework.tick()
+
+        self.fireworks = [f for f in self.fireworks if not f.dead()]
+    
+    def draw(self):
+        for firework in self.fireworks:
+            firework.draw(self.game.screen)

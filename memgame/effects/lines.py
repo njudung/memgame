@@ -3,13 +3,8 @@ from pygame.locals import *
 from random import random, choice, randint
 from math import atan2, sqrt, cos, sin, pi as PI
 
-FPS = 30
-TIME_PER_TICK = 1 / FPS
-DISPLAY_SIZE = (1920, 1080)
+from ..config import *
 
-K_air = 0.001  # Air resistance constant
-G_r = 100 / FPS  # Gravity constant
-G_phi = PI / 2
 
 COLORS = [
     Color(255, 0, 0),
@@ -52,39 +47,3 @@ class Line:
         if self.x + self.length < 0:
             return True
         return False
-
-
-pygame.init()
-clock = pygame.time.Clock()
-window = pygame.display.set_mode(DISPLAY_SIZE)
-
-lines = []
-
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-
-        if event.type == pygame.KEYDOWN and event.key == 102:
-            lines.append(Line())
-
-    for line in lines:
-        line.tick()
-
-    if randint(0, 19) == 0:
-        lines.append(Line())
-
-    lines = [line for line in lines if not line.dead()]
-
-
-    surface = pygame.Surface((DISPLAY_SIZE[0], DISPLAY_SIZE[1] * 1.4))
-    surface.fill(BACKGROUND)
-
-    for line in lines:
-        line.draw(surface)
-    
-    window.blit(surface, (0, - DISPLAY_SIZE[1] * 0.2))
-
-    pygame.display.flip()
-    clock.tick(FPS)
