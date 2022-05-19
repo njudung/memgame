@@ -4,13 +4,13 @@ from pygame.locals import *
 from gpiozero import Button, LED
 from signal import pause
 from time import sleep
-from random import randint
+from random import randint, choice
 from . import logger
 from .events import *
 from .colors import *
 from .state import State
-from .effects.lines import Line
-from .effects.fireworks import Firework
+from .effects.lines import Lines
+from .effects.fireworks import FireworkDouble
 from .config import *
 
 
@@ -25,7 +25,7 @@ def center_pos(src, dest):
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, kiosk=False):
         pygame.init()
 
         self.state = WaitState(self)
@@ -45,6 +45,7 @@ class Game:
         self.font_xlarge = pygame.font.SysFont(None, 350)
 
         self.screen = pygame.display.set_mode(DISPLAY_SIZE)
+        if kiosk: pygame.display.toggle_fullscreen()
 
         ## Initialize buttons
         for i, button in enumerate(self.buttons):
@@ -134,7 +135,10 @@ class Game:
 
 
 class WaitState(State):
-    lines = []
+    def __init__(self, game):
+        State.__init__(self, game)
+        
+        self.effect = Lines()
 
     def on_event(self, event):
         if event.type == BUTTON_PRESSED:
@@ -144,23 +148,11 @@ class WaitState(State):
             self.game.set_state(ShowCombinationState)
 
     def tick(self):
-        for line in self.lines:
-            line.tick()
-
-        if randint(0, 19) == 0:
-            self.lines.append(Line())
-
-        self.lines = [line for line in self.lines if not line.dead()]
+        self.effect.tick()
 
 
     def draw(self):
-        s = pygame.Surface((DISPLAY_SIZE[0], DISPLAY_SIZE[1] * 1.4))
-        s.fill(BG)
-
-        for line in self.lines:
-            line.draw(s)
-        
-        self.game.screen.blit(s, (0, - DISPLAY_SIZE[1] * 0.2))
+        self.effect.draw(self.game.screen)
 
         font = self.game.font_large
         text = font.render("MinnesSpel", True, FG)
@@ -287,14 +279,14 @@ class GameOverState(State):
 
 
 class HighScoreState(State):
-    fireworks = [Firework() for _ in range(5)]
+    fireworks = [FireworkDouble() for _ in range(3)]
 
     def on_event(self, event):
         pass
     
     def tick(self):
         if randint(0, 29) == 0:
-            self.fireworks.append(Firework())
+            self.fireworks.append(FireworkDouble())
         
         for firework in self.fireworks:
             firework.tick()

@@ -1,4 +1,4 @@
-import pygame, sys
+import pygame
 from pygame.locals import *
 from random import random, choice, randint
 from math import atan2, sqrt, cos, sin, pi as PI
@@ -6,8 +6,8 @@ from math import atan2, sqrt, cos, sin, pi as PI
 from ..config import *
 
 
-K_air = 0.001  # Air resistance constant
-G_r = 100 / TICKS  # Gravity constant
+K_air = 0.005  # Air resistance constant
+G_r = 300 / TICKS  # Gravity constant
 G_phi = PI / 2
 
 COLORS = [
@@ -89,7 +89,7 @@ class Firework:
         self.particles = [
             Particle(
                 position=(1920 / 2, 1079),
-                velocity=400 * random() + 200,
+                velocity=400 * random() + 400,
                 direction=-PI / 2 + (random() - 0.5),
                 color=Color(70, 70, 70),
                 fade=0,
@@ -144,12 +144,12 @@ class FireworkDouble(Firework):
     def explode(self, direction, velocity, position, color):
         particles = []
         for _ in range(50):
-            r, phi = Particle.vector_add(velocity, direction, 20 * random() + 80, 2 * PI * random())
+            r, phi = Particle.vector_add(velocity, direction, 60 * random() + 80, 2 * PI * random())
             particles.append(Particle(direction=phi, velocity=r, position=position, color=color))
 
         color = choice(COLORS)
         for _ in range(50):
-            r, phi = Particle.vector_add(velocity, direction, 20 * random() + 40, 2 * PI * random())
+            r, phi = Particle.vector_add(velocity, direction, 60 * random() + 40, 2 * PI * random())
             particles.append(Particle(direction=phi, velocity=r, position=position, color=color))
 
         return particles
