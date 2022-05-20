@@ -143,12 +143,12 @@ class Firework:
 class FireworkDouble(Firework):
     def explode(self, direction, velocity, position, color):
         particles = []
-        for _ in range(50):
+        for _ in range(25):
             r, phi = Particle.vector_add(velocity, direction, 60 * random() + 80, 2 * PI * random())
             particles.append(Particle(direction=phi, velocity=r, position=position, color=color))
 
         color = choice(COLORS)
-        for _ in range(50):
+        for _ in range(25):
             r, phi = Particle.vector_add(velocity, direction, 60 * random() + 40, 2 * PI * random())
             particles.append(Particle(direction=phi, velocity=r, position=position, color=color))
 

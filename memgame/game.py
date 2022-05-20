@@ -251,7 +251,10 @@ class RepeatCombinationState(State):
                     self.game.set_state(ShowCombinationState)
 
             else:
-                self.game.set_state(GameOverState)
+                if True:
+                    self.game.set_state(HighScoreState)
+                else:
+                    self.game.set_state(GameOverState)
 
     def draw(self):
         font = self.game.font_large
@@ -281,9 +284,26 @@ class GameOverState(State):
 class HighScoreState(State):
     fireworks = [FireworkDouble() for _ in range(3)]
 
+    symbols = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
     def on_event(self, event):
-        pass
-    
+        if event.type == STATE_CHANGED:
+            self.current_pos = 0
+            self.name = ""
+        if event.type == BUTTON_PRESSED:
+            if event.num == 0:
+                self.current_pos -= 1
+                if self.current_pos < 0:
+                    self.current_pos = len(HighScoreState.symbols) - 1
+            if event.num == 1:
+                if len(self.name) < 3:
+                    self.name += HighScoreState.symbols[self.current_pos]
+            if event.num == 2:
+                self.current_pos += 1
+                if self.current_pos >= len(HighScoreState.symbols):
+                    self.current_pos = 0
+
+
     def tick(self):
         if randint(0, 29) == 0:
             self.fireworks.append(FireworkDouble())
@@ -292,7 +312,21 @@ class HighScoreState(State):
             firework.tick()
 
         self.fireworks = [f for f in self.fireworks if not f.dead()]
-    
+
+
     def draw(self):
         for firework in self.fireworks:
             firework.draw(self.game.screen)
+
+        font = self.game.font_xlarge
+
+        for i in range(3):
+            x = self.game.screen.get_width() // 2 - 300
+            y = self.game.screen.get_height() // 2
+            pygame.draw.rect(self.game.screen, HIGH_SCORE_COMP, (x - 125 + 300 * i, y - 150, 250, 300))
+
+            letter = font.render(self.name[i] if len(self.name) > i else "A", True, HIGH_SCORE_FG)
+            self.game.screen.blit(letter, (x + 300 * i - letter.get_width() // 2, y - letter.get_height() + 130 ))
+
+        letter = font.render(HighScoreState.symbols[self.current_pos], True, HIGH_SCORE_HL)
+        self.game.screen.blit(letter, (x + 300 * len(self.name) - letter.get_width() // 2, y - letter.get_height() + 130))
